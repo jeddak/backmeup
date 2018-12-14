@@ -1,0 +1,240 @@
+#!/bin/zsh
+# -xv
+
+# makes an incremental (aka differential) backup
+function incr_backup() {
+    PARENT_BACKUP_DIR=$1
+    MACHINE=$2
+    DATESTAMP=$3
+    BACKUP_DIR=${PARENT_BACKUP_DIR}/${DATESTAMP}-DIFF
+
+    if [ ! -d ${BACKUP_DIR} ]
+    then
+	mkdir -p ${BACKUP_DIR}
+    else
+	echo "backup directory ${BACKUP_DIR} already exists"
+    fi
+
+    echo "making a differential backup to ${BACKUP_DIR}/"
+    BACKUP_ARCHIVE="${BACKUP_DIR}/${MACHINE}-${DATESTAMP}-DIFF"
+    PREV_ARCH_DIR=`/bin/ls -1t ${PARENT_BACKUP_DIR} | grep FULL | /usr/bin/tail -n 1`
+    PREV_ARCH_FILE=`ls -1tr ${PARENT_BACKUP_DIR}/${PREV_ARCH_DIR} | /usr/bin/tail -n 1`
+    # derive the previous backup set from the previous archive file name
+    LEN=`echo $PREV_ARCH_FILE | wc -c`
+    let "TRUNC_LEN=$LEN-9"
+    CHARTEST=`cut $PREV_ARCH_FILE $TRUNC_LEN`
+    #if [[ $CHARTEST == '.'  ]]
+    #then
+    #   let "TRUNC_LEN=$LEN-9"
+    #fi
+    PREV_ARCH_BASE=`echo $PREV_ARCH_FILE | cut -c 1-$TRUNC_LEN`
+
+    dar -v \
+	-s $MAX_SIZE \
+	-P tmp \
+	-c ${BACKUP_ARCHIVE} \
+	-A ${PARENT_BACKUP_DIR}/${PREV_ARCH_DIR}/${PREV_ARCH_BASE} -R /  \
+        -B ${CFG_FILE}
+    donetime=`date`
+    echo "Differential backup $BACKUP_ARCHIVE completed at ${donetime}"
+    echo "backed up to `/usr/bin/du -sh ${BACKUP_DIR}`"
+}
+
+# makes a full backup
+function full_backup() {
+    BACKUP_DIR=$1
+    MACHINE=$2
+    DATESTAMP=$3
+    BACKUP_DIR=${PARENT_BACKUP_DIR}/${DATESTAMP}-FULL
+
+    if [ ! -d ${BACKUP_DIR} ]
+    then
+	mkdir -p ${BACKUP_DIR}
+    else
+	echo "backup directory ${BACKUP_DIR} already exists"
+    fi
+
+    echo "making a full backup to ${BACKUP_DIR}/"
+    BACKUP_ARCHIVE="${BACKUP_DIR}/${MACHINE}-${DATESTAMP}-FULL"
+    dar -v \
+	-s $MAX_SIZE \
+	-c $BACKUP_ARCHIVE \
+	-R / \
+        -B ${CFG_FILE}
+    donetime=`date`
+    echo "Full backup ${BACKUP_ARCHIVE} completed at ${donetime}"
+    echo "backed up to `/usr/bin/du -sh ${BACKUP_DIR}`"
+}
+
+# TODO make this work
+# should delete oldest backup sets in chronological order 
+# until there is ${MIN_FREE} bytes of free space
+function cleanup() {
+    BACKUP_DIR=$1
+    MIN_FREE=$2
+
+    # build a list of backups in oldest -> newest order
+    BACKUPS=(`ls -1 ${BACKUP_DIR} | grep ${MACHINE} | awk '{print substr($1,0,23)}' | uniq`)
+
+    # loop through backups
+    for i in ${BACKUPS}; do
+	#echo "\n\ni = $i" #DEBUG
+	size=`du ${BACKUP_DIR}/$i* |  awk '{ sum += $0 } END { print sum }'`
+	sizeh=`du -h ${BACKUP_DIR}/$i* |  awk '{ sum += $0 } END { print sum }'`
+	#echo "size = $size" #DEBUG
+	echo "deleting ${BACKUP_DIR}/$i* (${sizeh}M)"
+	rm -rf $i*	
+	DRIVE_FREE=`df | grep ${DRIVE} | awk '{print $4}'`
+
+       # break out, if there is at least ${MIN_FREE} free bytes
+        if [[ ( ${DRIVE_FREE} -gt ${MIN_FREE} ) ]]
+	then
+	    break
+	fi
+        # otherwise, delete the next oldest backup
+    done
+    drive_freeh=`df -h | grep ${DRIVE} | awk '{print $4}'`
+    echo "Now have ${drive_freeh} free space"
+}
+
+
+function usage() {
+    echo "Usage:\n"
+    echo "\tbackmeup "
+    echo "\t\t-f {configuration file} "
+    echo "\t\t-d {backup directory} "
+    echo "\t\t-t {backup type} \n"
+    echo "arguments:\n"
+    echo "\t{backup type} is full | diff"
+    echo "\t\tfull does a full backup of everything specified in the configuration file"
+    echo "\t\tdiff does an incremental backup of everything specified in the configuration file based on the changes made since the last backup\n"
+    echo "\n\nexample:\n\tbackmeup -f ~/.backmeup.cfg -d /media/jdonald/BACKUP4T/backup/armenelos -t diff"
+}
+
+# ---------------------------------------------------------
+
+MACHINE=`uname -n`
+BACKUP_NAME="${MACHINE}"
+MIN_FREE=200000000
+MAX_SIZE="256M"
+
+#DRIVE="/media/backupdrive"
+#PARENT_BACKUP_DIR="${DRIVE}/backup/${MACHINE}"
+
+
+if (( $# != 6 ))
+then
+    echo "wrong number of arguments passed"
+    usage
+    exit 1
+fi
+
+
+
+# : indicates the preceding letter option requires a parameter
+while getopts "f:d:t:h" opt; 
+do
+    case ${opt} in
+	f )
+	    CFG_FILE=${OPTARG}
+	    echo "CFG_FILE=$CFG_FILE"
+	    ;;
+	: ) echo "$0: Must supply an argument to -${OPTARG}"
+         exit 1
+         ;;
+	d )
+            PARENT_BACKUP_DIR=${OPTARG}
+            ;;
+	: ) echo "$0: Must supply an argument to -${OPTARG}"
+         exit 1
+          ;;
+	t )
+	    TYPE=${OPTARG}
+	    echo "TYPE=$TYPE"
+	    ;;
+	: ) echo "$0: Must supply an argument to -${OPTARG}"
+         exit 1
+          ;;
+	h )
+	    usage
+	    ;;
+       *) echo "Invalid option -${OPTARG} ignored"
+	     usage
+	     exit 1
+	 ;;
+	\? ) echo "Invalid option -${OPTARG} ignored"
+	     usage
+	     exit 1
+	 ;;
+    esac
+done
+
+# if [ $OPTIND -eq 1 ]
+#then
+#    echo "No options were passed"
+#    usage
+#    exit 1
+#fi
+
+if [[ -d "${PARENT_BACKUP_DIR}" ]]
+then
+    echo ""
+else
+    echo "${PARENT_BACKUP_DIR} is not a directory" >&2
+    exit 1
+fi
+
+if [[ ${PARENT_BACKUP_DIR} == "" ]]
+then
+    echo "no parent backup directory specified"
+    exit
+fi
+
+
+
+# abort if backup drive isn't actually mounted
+#lookupmount=`mount -l | grep "${DRIVE}"`
+#mounted=`echo $lookupmount | awk '{print $3}'`
+
+#if [[ (  ${mounted} != ${DRIVE} ) ]]
+#then
+#    echo "backup volume ${DRIVE} is not mounted!"
+#    exit 1
+#fi
+
+
+# check to see if $PARENT_BACKUP_DIR exists
+if [ ! -d ${PARENT_BACKUP_DIR} ]
+then
+    mkdir -p ${PARENT_BACKUP_DIR}
+else
+    echo "backup directory ${PARENT_BACKUP_DIR} already exists"
+fi
+
+echo "cleaning up ${PARENT_BACKUP_DIR} to remove any empty directories"
+rmdir -v ${PARENT_BACKUP_DIR}/*
+
+# how much free space there is on ${DRIVE}
+#DRIVE_FREE=`df | grep ${DRIVE} | awk '{print $4}'`
+
+#if [[ ( ${DRIVE_FREE} -lt ${MIN_FREE} )  ]]
+#then
+#    echo "not enough free space on ${DRIVE}"
+#    cleanup ${PARENT_BACKUP_DIR} ${MIN_FREE}
+#else
+#    echo "plenty of free space on ${DRIVE}"
+#fi
+
+DATESTAMP=`date +%Y%m%d-%H%M`
+
+
+
+if [[ ( $TYPE != "full" ) && ( $TYPE != "FULL" ) ]] 
+then
+    incr_backup ${PARENT_BACKUP_DIR} ${MACHINE} ${DATESTAMP}
+else
+    full_backup ${PARENT_BACKUP_DIR} ${MACHINE} ${DATESTAMP}
+fi
+
+
+
