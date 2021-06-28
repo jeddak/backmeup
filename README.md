@@ -12,13 +12,18 @@ This was written for Debian Linux, although it should work fine on other distros
 ## Usage
 
 `backmeup`
+
    `-f` {configuration file}
+   
    `-d` {backup directory}
+   
    `-t` {backup type}
 
 arguments:
   {backup type} is `full` | `diff`
+  
     `full` does a full backup of everything specified in the configuration file
+
     `diff` does an incremental backup of everything specified in the configuration file based on the changes made since the last backup
 
 example:
