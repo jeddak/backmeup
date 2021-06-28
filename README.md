@@ -20,15 +20,16 @@ This was written for Debian Linux, although it should work fine on other distros
    `-t` {backup type}
 
 arguments:
-  {backup type} is `full` | `diff`
-  
-    `full` does a full backup of everything specified in the configuration file
 
-    `diff` does an incremental backup of everything specified in the configuration file based on the changes made since the last backup
+{backup type} is `full` | `diff`
+  
+`full` does a full backup of everything specified in the configuration file
+
+`diff` does an incremental backup of everything specified in the configuration file based on the changes made since the last backup
 
 example:
 
-   `backmeup -f ~/.backmeup.cfg -d /media/tsawyer/BACKDUMP/backup/phobos -t diff`
+   backmeup -f ~/.backmeup.cfg -d /media/tsawyer/BACKDUMP/backup/phobos -t diff
 
 ## Operation - What It Does
 
