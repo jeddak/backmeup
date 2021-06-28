@@ -10,7 +10,7 @@
 #     awk
 #     cut
 #     dar
-#     df
+#     /bin/df
 #     du
 #     echo
 #     grep
@@ -98,7 +98,7 @@ function full_backup() {
 function get_mount_point() {
     DIR=$1
     FULL_PATH=`/usr/bin/realpath ${DIR}`
-    DRIVE=`df ${FULL_PATH} | awk 'END{print $6}'`
+    DRIVE=`/bin/df ${FULL_PATH} | awk 'END{print $6}'`
     /bin/echo ${DRIVE}
     }
 
@@ -121,7 +121,7 @@ function cleanup() {
 	sizeh=`/usr/bin/du -h ${BACKUP_DIR}/$i* |  /usr/bin/awk '{ sum += $0 } END { print sum }'`
 	/bin/echo "deleting ${BACKUP_DIR}/$i* (${sizeh}M)"
 	/bin/echo "/bin/rm -rf ${BACKUP_DIR}/$i*"
-	DRIVE_FREE=`df | /bin/grep ${DRIVE} | awk '{print $4}'`
+	DRIVE_FREE=`/bin/df | /bin/grep ${DRIVE} | awk '{print $4}'`
 
        # break out, if there is at least ${MIN_FREE} free bytes
         if [[ ( ${DRIVE_FREE} -ge ${MIN_FREE} ) ]]
@@ -130,7 +130,7 @@ function cleanup() {
 	fi
         # otherwise, delete the next oldest backup
     done
-    drive_freeh=`df -h | /bin/grep ${DRIVE} | awk '{print $4}'`
+    drive_freeh=`/bin/df -h | /bin/grep ${DRIVE} | awk '{print $4}'`
     /bin/echo "Now has ${drive_freeh} free space"
 }
 
@@ -139,12 +139,7 @@ function cleanup() {
 #    parameter 1: the drive (mount point) on which to check free space
 function have_sufficient_free_space() {
     DRIVE=$1
-    
-    DRIVE_TOTAL_BLOCKS=`/bin/df -k | /bin/grep ${DRIVE} | awk '{print $2}'`
-
-    MIN_FREE_PERCENT=.8
-    MIN_FREE_BLOCKS=$(($DRIVE_TOTAL_BLOCKS * $MIN_FREE_PERCENT)) 
-    MIN_FREE_BLOCKS=${MIN_FREE_BLOCKS:0:-1} #strip that ^#@$ trailing decimal point
+    MIN_FREE_BLOCKS=$2
     
     DRIVE_FREE_BLOCKS=`/bin/df -k | /bin/grep ${DRIVE} | awk '{print $4}'`
 
@@ -156,6 +151,9 @@ function have_sufficient_free_space() {
     fi
 }
 
+
+# help message
+# (no parameters)
 function usage() {
     /bin/echo "Usage:\n"
     /bin/echo "\tbackmeup "
@@ -173,8 +171,8 @@ function usage() {
 
 MACHINE=`uname -n`
 BACKUP_NAME="${MACHINE}"
-MIN_FREE=200000000
 MAX_SIZE="512M"
+
 
 if (( $# != 6 ))
 then
@@ -221,6 +219,14 @@ do
     esac
 done
 
+
+DRIVE=`get_mount_point ${PARENT_BACKUP_DIR}`
+DRIVE_TOTAL_BLOCKS=`/bin/df -k | /bin/grep ${DRIVE} | awk '{print $2}'`
+MIN_FREE_PERCENT=.8
+MIN_FREE_BLOCKS=$(($DRIVE_TOTAL_BLOCKS * $MIN_FREE_PERCENT)) 
+MIN_FREE_BLOCKS=${MIN_FREE_BLOCKS:0:-1} #strip that ^#@$ trailing decimal point
+
+
 if [[ -d "${PARENT_BACKUP_DIR}" ]]
 then
     /bin/echo ""
@@ -235,9 +241,8 @@ then
 fi
 
 
-DRIVE=`get_mount_point ${PARENT_BACKUP_DIR}`
 
-freeness=`have_sufficient_free_space ${DRIVE}`
+freeness=`have_sufficient_free_space ${DRIVE} ${MIN_FREE_BLOCKS}`
 
 if [[  ${freeness} -eq 1 ]]
 then
