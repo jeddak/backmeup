@@ -102,7 +102,7 @@ function get_mount_point() {
     /bin/echo ${DRIVE}
     }
 
-# should delete oldest backup sets in chronological order 
+# progressively deletes oldest backup sets in chronological order 
 # until there is ${MIN_FREE} bytes of free space
 #    parameter 1: the backup directory path
 #    parameter 2: the minimum amount of free space required
@@ -115,7 +115,6 @@ function cleanup() {
     # build a list of backups in oldest -> newest order
     BACKUPS=(`/bin/ls -1tr ${BACKUP_DIR}`)
 
-    # loop through backups
     for i in ${BACKUPS}; do
 	size=`/usr/bin/du ${BACKUP_DIR}/$i* |  /usr/bin/awk '{ sum += $0 } END { print sum }'`
 	sizeh=`/usr/bin/du -h ${BACKUP_DIR}/$i* |  /usr/bin/awk '{ sum += $0 } END { print sum }'`
@@ -124,8 +123,6 @@ function cleanup() {
         /bin/rm -rf ${BACKUP_DIR}/${i}
         DRIVE_FREE_BLOCKS=`/bin/df -k | /bin/grep ${DRIVE} | awk '{print $4}'`
 
-        # break out, if there is at least ${MIN_FREE} free bytes
-        # BUG: does not break out of the loop; result is that all archives are deleted(!!!!)
         if [[ ( ${DRIVE_FREE_BLOCKS} -ge ${MIN_FREE} ) ]]
 	then
 	    break
