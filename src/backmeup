@@ -27,9 +27,9 @@
 #    parameter 2: the name (hostname) of the machine being backed up
 #    parameter 3: the current date/time stamp
 function incr_backup() {
-    PARENT_BACKUP_DIR=$1
-    MACHINE=$2
-    DATESTAMP=$3
+    PARENT_BACKUP_DIR=${1}
+    MACHINE=${2}
+    DATESTAMP=${3}
     BACKUP_DIR=${PARENT_BACKUP_DIR}/${DATESTAMP}-DIFF
 
     if [ ! -d ${BACKUP_DIR} ]
@@ -44,23 +44,23 @@ function incr_backup() {
     PREV_ARCH_DIR=`/bin/ls -1t ${PARENT_BACKUP_DIR} | /bin/grep FULL | /usr/bin/tail -n 1`
     PREV_ARCH_FILE=`/bin/ls -1tr ${PARENT_BACKUP_DIR}/${PREV_ARCH_DIR} | /usr/bin/tail -n 1`
     # derive the previous backup set from the previous archive file name
-    LEN=`/bin/echo $PREV_ARCH_FILE | wc -c`
-    let "TRUNC_LEN=$LEN-9"
-    CHARTEST=`cut $PREV_ARCH_FILE $TRUNC_LEN`
+    LEN=`/bin/echo ${PREV_ARCH_FILE} | wc -c`
+    let "TRUNC_LEN=${LEN}-9"
+    CHARTEST=`cut ${PREV_ARCH_FILE} ${TRUNC_LEN}`
     #if [[ $CHARTEST == '.'  ]]
     #then
     #   let "TRUNC_LEN=$LEN-9"
     #fi
-    PREV_ARCH_BASE=`/bin/echo $PREV_ARCH_FILE | cut -c 1-$TRUNC_LEN`
+    PREV_ARCH_BASE=`/bin/echo ${PREV_ARCH_FILE} | cut -c 1-${TRUNC_LEN}`
 
     dar -v \
-	-s $MAX_SIZE \
+	-s ${MAX_SIZE} \
 	-P tmp \
 	-c ${BACKUP_ARCHIVE} \
 	-A ${PARENT_BACKUP_DIR}/${PREV_ARCH_DIR}/${PREV_ARCH_BASE} -R /  \
         -B ${CFG_FILE}
     donetime=`date`
-    /bin/echo "Differential backup $BACKUP_ARCHIVE completed at ${donetime}"
+    /bin/echo "Differential backup ${BACKUP_ARCHIVE} completed at ${donetime}"
     /bin/echo "backed up to `/usr/bin/du -sh ${BACKUP_DIR}`"
 }
 
@@ -69,9 +69,9 @@ function incr_backup() {
 #    parameter 2: the name (hostname) of the machine being backed up
 #    parameter 3: the current date/time stamp
 function full_backup() {
-    BACKUP_DIR=$1
-    MACHINE=$2
-    DATESTAMP=$3
+    BACKUP_DIR=${1}
+    MACHINE=${2}
+    DATESTAMP=${3}
     BACKUP_DIR=${PARENT_BACKUP_DIR}/${DATESTAMP}-FULL
 
     if [ ! -d ${BACKUP_DIR} ]
@@ -84,8 +84,8 @@ function full_backup() {
     /bin/echo "making a full backup to ${BACKUP_DIR}/"
     BACKUP_ARCHIVE="${BACKUP_DIR}/${MACHINE}-${DATESTAMP}-FULL"
     dar -v \
-	-s $MAX_SIZE \
-	-c $BACKUP_ARCHIVE \
+	-s ${MAX_SIZE} \
+	-c ${BACKUP_ARCHIVE} \
 	-R / \
         -B ${CFG_FILE}
     donetime=`date`
@@ -96,7 +96,7 @@ function full_backup() {
 # given a directory or file, this tells you what mount point it lives on
 #    parameter 1: the directory or file path
 function get_mount_point() {
-    DIR=$1
+    DIR=${1}
     FULL_PATH=`/usr/bin/realpath ${DIR}`
     DRIVE=`/bin/df ${FULL_PATH} | awk 'END{print $6}'`
     /bin/echo ${DRIVE}
@@ -108,9 +108,9 @@ function get_mount_point() {
 #    parameter 2: the minimum amount of free space required
 #    parameter 3: the drive (mount point) on which to check free space
 function cleanup() {
-    BACKUP_DIR=$1
-    MIN_FREE=$2
-    DRIVE=$3
+    BACKUP_DIR=${1}
+    MIN_FREE=${2}
+    DRIVE=${3}
 
     # build a list of backups in oldest -> newest order
     BACKUPS=(`/bin/ls -1tr ${BACKUP_DIR}`)
@@ -119,12 +119,14 @@ function cleanup() {
     for i in ${BACKUPS}; do
 	size=`/usr/bin/du ${BACKUP_DIR}/$i* |  /usr/bin/awk '{ sum += $0 } END { print sum }'`
 	sizeh=`/usr/bin/du -h ${BACKUP_DIR}/$i* |  /usr/bin/awk '{ sum += $0 } END { print sum }'`
-	/bin/echo "deleting ${BACKUP_DIR}/$i* (${sizeh}M)"
-	/bin/echo "/bin/rm -rf ${BACKUP_DIR}/$i*"
-	DRIVE_FREE=`/bin/df | /bin/grep ${DRIVE} | awk '{print $4}'`
+	/bin/echo "deleting ${BACKUP_DIR}/${i}* (${sizeh}M)"
+	/bin/echo "/bin/rm -rf ${BACKUP_DIR}/${i}*"
+        /bin/rm -rf ${BACKUP_DIR}/${i}
+        DRIVE_FREE_BLOCKS=`/bin/df -k | /bin/grep ${DRIVE} | awk '{print $4}'`
 
-       # break out, if there is at least ${MIN_FREE} free bytes
-        if [[ ( ${DRIVE_FREE} -ge ${MIN_FREE} ) ]]
+        # break out, if there is at least ${MIN_FREE} free bytes
+        # BUG: does not break out of the loop; result is that all archives are deleted(!!!!)
+        if [[ ( ${DRIVE_FREE_BLOCKS} -ge ${MIN_FREE} ) ]]
 	then
 	    break
 	fi
@@ -138,12 +140,12 @@ function cleanup() {
 # TODO externalize MIN_FREE_PERCENT
 #    parameter 1: the drive (mount point) on which to check free space
 function have_sufficient_free_space() {
-    DRIVE=$1
-    MIN_FREE_BLOCKS=$2
+    DRIVE=${1}
+    MIN_FREE_BLOCKS=${2}
     
     DRIVE_FREE_BLOCKS=`/bin/df -k | /bin/grep ${DRIVE} | awk '{print $4}'`
 
-    if [[ ( ${DRIVE_FREE_BLOCKS} -le ${MIN_FREE_BLOCKS} ) ]]
+    if [[ ( ${DRIVE_FREE_BLOCKS} -ge ${MIN_FREE_BLOCKS} ) ]]
     then
         /bin/echo 1
     else
@@ -223,7 +225,7 @@ done
 DRIVE=`get_mount_point ${PARENT_BACKUP_DIR}`
 DRIVE_TOTAL_BLOCKS=`/bin/df -k | /bin/grep ${DRIVE} | awk '{print $2}'`
 MIN_FREE_PERCENT=.8
-MIN_FREE_BLOCKS=$(($DRIVE_TOTAL_BLOCKS * $MIN_FREE_PERCENT)) 
+MIN_FREE_BLOCKS=$(($DRIVE_TOTAL_BLOCKS * $MIN_FREE_PERCENT))
 MIN_FREE_BLOCKS=${MIN_FREE_BLOCKS:0:-1} #strip that ^#@$ trailing decimal point
 
 
@@ -240,8 +242,6 @@ then
     /bin/mkdir -p ${PARENT_BACKUP_DIR}
 fi
 
-
-
 freeness=`have_sufficient_free_space ${DRIVE} ${MIN_FREE_BLOCKS}`
 
 if [[  ${freeness} -eq 1 ]]
@@ -249,7 +249,7 @@ then
     /bin/echo "plenty of free space on ${DRIVE}"
 else
     /bin/echo "not enough free space on ${DRIVE}"
-    cleanup ${PARENT_BACKUP_DIR}/${MACHINE} ${MIN_FREE_BLOCKS} ${DRIVE}
+    cleanup ${PARENT_BACKUP_DIR} ${MIN_FREE_BLOCKS} ${DRIVE}
 fi
 
 DATESTAMP=`date +%Y%m%d-%H%M`
@@ -260,10 +260,3 @@ then
 else
     full_backup ${PARENT_BACKUP_DIR} ${MACHINE} ${DATESTAMP}
 fi
-
-
-
-
-
-
-
