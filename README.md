@@ -1,7 +1,7 @@
 # backmeup
 ## Description
 
-A backup script, which is actually a convenience wrapper for `dar` ( https://dar.linux.free.fr ) tool written in `zsh`.
+A backup script, which is actually a convenience wrapper for [`dar`](https://dar.linux.free.fr) tool written in `zsh`.
 
 ## Dependencies
 Requires `zsh`, `dar`, `awk`, `cut`, `df`, `du`, `echo`, `grep`, `mkdir`, `realpath`, `tail`, `uname`
