@@ -45,12 +45,8 @@ function incr_backup() {
     PREV_ARCH_FILE=`/bin/ls -1tr ${PARENT_BACKUP_DIR}/${PREV_ARCH_DIR} | /usr/bin/tail -n 1`
     # derive the previous backup set from the previous archive file name
     LEN=`/bin/echo ${PREV_ARCH_FILE} | wc -c`
-    let "TRUNC_LEN=${LEN}-9"
-    CHARTEST=`cut ${PREV_ARCH_FILE} ${TRUNC_LEN}`
-    #if [[ $CHARTEST == '.'  ]]
-    #then
-    #   let "TRUNC_LEN=$LEN-9"
-    #fi
+    let MACHINE_LEN=`echo $MACHINE | wc -c`
+    let "TRUNC_LEN=${LEN}-${MACHINE_LEN}+1"
     PREV_ARCH_BASE=`/bin/echo ${PREV_ARCH_FILE} | cut -c 1-${TRUNC_LEN}`
 
     dar -v \
@@ -241,13 +237,14 @@ fi
 
 freeness=`have_sufficient_free_space ${DRIVE} ${MIN_FREE_BLOCKS}`
 
-if [[  ${freeness} -eq 1 ]]
-then
-    /bin/echo "plenty of free space on ${DRIVE}"
-else
-    /bin/echo "not enough free space on ${DRIVE}"
-    cleanup ${PARENT_BACKUP_DIR} ${MIN_FREE_BLOCKS} ${DRIVE}
-fi
+# TODO fix cleanup routine
+# if [[  ${freeness} -eq 1 ]]
+# then
+#     /bin/echo "plenty of free space on ${DRIVE}"
+# else
+#     /bin/echo "not enough free space on ${DRIVE}"
+#     cleanup ${PARENT_BACKUP_DIR} ${MIN_FREE_BLOCKS} ${DRIVE}
+# fi
 
 DATESTAMP=`date +%Y%m%d-%H%M`
 
