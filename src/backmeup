@@ -60,7 +60,7 @@ function incr_backup() {
     /bin/echo "backed up to `/usr/bin/du -sh ${BACKUP_DIR}`"
 }
 
-# makes a full backup
+# make a full backup
 #    parameter 1: the backup destination directory
 #    parameter 2: the name (hostname) of the machine being backed up
 #    parameter 3: the current date/time stamp
@@ -89,7 +89,7 @@ function full_backup() {
     /bin/echo "backed up to `/usr/bin/du -sh ${BACKUP_DIR}`"
 }
 
-# given a directory or file, this tells you what mount point it lives on
+# determine the mount point of a directory or file
 #    parameter 1: the directory or file path
 function get_mount_point() {
     DIR=${1}
@@ -98,8 +98,8 @@ function get_mount_point() {
     /bin/echo ${DRIVE}
     }
 
-# progressively deletes oldest backup sets in chronological order 
-# until there is ${MIN_FREE} bytes of free space
+# progressively delete oldest backup sets in chronological order 
+# until there is at least ${MIN_FREE} bytes of free space
 #    parameter 1: the backup directory path
 #    parameter 2: the minimum amount of free space required
 #    parameter 3: the drive (mount point) on which to check free space
@@ -115,29 +115,24 @@ function cleanup() {
 	size=`/usr/bin/du ${BACKUP_DIR}/$i* |  /usr/bin/awk '{ sum += $0 } END { print sum }'`
 	sizeh=`/usr/bin/du -h ${BACKUP_DIR}/$i* |  /usr/bin/awk '{ sum += $0 } END { print sum }'`
 	/bin/echo "deleting ${BACKUP_DIR}/${i}* (${sizeh}M)"
-	/bin/echo "/bin/rm -rf ${BACKUP_DIR}/${i}*"
-        /bin/rm -rf ${BACKUP_DIR}/${i}
+        /bin/rm -rfv ${BACKUP_DIR}/${i}
         DRIVE_FREE_BLOCKS=`/bin/df -k | /bin/grep ${DRIVE} | awk '{print $4}'`
-
         if [[ ( ${DRIVE_FREE_BLOCKS} -ge ${MIN_FREE} ) ]]
 	then
 	    break
 	fi
-        # otherwise, delete the next oldest backup
     done
     drive_freeh=`/bin/df -h | /bin/grep ${DRIVE} | awk '{print $4}'`
     /bin/echo "Now has ${drive_freeh} free space"
 }
 
-# returns 1 if there is sufficient free space or 0 if there is not
+# return 1 if there is sufficient free space or 0 if there is not
 # TODO externalize MIN_FREE_PERCENT
 #    parameter 1: the drive (mount point) on which to check free space
 function have_sufficient_free_space() {
     DRIVE=${1}
     MIN_FREE_BLOCKS=${2}
-    
-    DRIVE_FREE_BLOCKS=`/bin/df -k | /bin/grep ${DRIVE} | awk '{print $4}'`
-
+    DRIVE_FREE_BLOCKS=`/bin/df -k ${DRIVE} | /bin/grep ${DRIVE} | awk '{print $4}'`    
     if [[ ( ${DRIVE_FREE_BLOCKS} -ge ${MIN_FREE_BLOCKS} ) ]]
     then
         /bin/echo 1
@@ -216,11 +211,12 @@ done
 
 
 DRIVE=`get_mount_point ${PARENT_BACKUP_DIR}`
-DRIVE_TOTAL_BLOCKS=`/bin/df -k | /bin/grep ${DRIVE} | awk '{print $2}'`
-MIN_FREE_PERCENT=.8
-MIN_FREE_BLOCKS=$(($DRIVE_TOTAL_BLOCKS * $MIN_FREE_PERCENT))
-MIN_FREE_BLOCKS=${MIN_FREE_BLOCKS:0:-1} #strip that ^#@$ trailing decimal point
 
+DRIVE_TOTAL_BLOCKS=`/bin/df -k ${DRIVE} | /bin/grep ${DRIVE} | awk '{print $2}'`
+
+MIN_FREE_PERCENT=.25
+MIN_FREE_BLOCKS=$(($DRIVE_TOTAL_BLOCKS * $MIN_FREE_PERCENT))
+MIN_FREE_BLOCKS=${MIN_FREE_BLOCKS:0:-1} #strip the trailing decimal point
 
 if [[ -d "${PARENT_BACKUP_DIR}" ]]
 then
@@ -237,14 +233,13 @@ fi
 
 freeness=`have_sufficient_free_space ${DRIVE} ${MIN_FREE_BLOCKS}`
 
-# TODO fix cleanup routine
-# if [[  ${freeness} -eq 1 ]]
-# then
-#     /bin/echo "plenty of free space on ${DRIVE}"
-# else
-#     /bin/echo "not enough free space on ${DRIVE}"
-#     cleanup ${PARENT_BACKUP_DIR} ${MIN_FREE_BLOCKS} ${DRIVE}
-# fi
+if [[ ${freeness} -eq 1 ]]
+then
+    /bin/echo "plenty of free space on ${DRIVE}"
+else
+    /bin/echo "not enough free space on ${DRIVE}"
+    cleanup ${PARENT_BACKUP_DIR} ${MIN_FREE_BLOCKS} ${DRIVE}
+fi
 
 DATESTAMP=`date +%Y%m%d-%H%M`
 
