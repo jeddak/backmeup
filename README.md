@@ -45,7 +45,9 @@ backup
 
 ### Example
 
+   ```
    backmeup -f ~/.backmeup.cfg -d /media/tsawyer/BACKDUMP/backup/phobos -t diff
+   ```
 
 ## What It Does
 
