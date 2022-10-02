@@ -96,7 +96,12 @@ function get_mount_point() {
     FULL_PATH=`/usr/bin/realpath ${DIR}`
     DRIVE=`/bin/df ${FULL_PATH} | awk 'END{print $6}'`
     /bin/echo ${DRIVE}
-    }
+}
+
+function remove_empty_backup_dirs() {
+    BACKUP_DIR=${1}
+    rmdir -v $BACKUP_DIR/*
+}
 
 # progressively delete oldest backup sets in chronological order 
 # until there is at least ${MIN_FREE} bytes of free space
@@ -240,6 +245,8 @@ else
     /bin/echo "not enough free space on ${DRIVE}"
     cleanup ${PARENT_BACKUP_DIR} ${MIN_FREE_BLOCKS} ${DRIVE}
 fi
+
+remove_empty_backup_dirs ${PARENT_BACKUP_DIR}
 
 DATESTAMP=`date +%Y%m%d-%H%M`
 
